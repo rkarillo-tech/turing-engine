@@ -7,8 +7,10 @@ Uso:
     python3 tests/test_juego.py
 """
 import asyncio
+import os
 import pathlib
 import sys
+import traceback
 
 from playwright.async_api import async_playwright
 
@@ -17,9 +19,15 @@ fallos = []
 
 
 def comprobar(cond, msg):
-    print(('  ✓ ' if cond else '  ✗ ') + msg)
+    print(('  ✓ ' if cond else '  ✗ ') + msg, flush=True)
     if not cond:
         fallos.append(msg)
+        if os.environ.get('GITHUB_ACTIONS'):
+            print(f'::error title=Prueba fallida::{msg}', flush=True)
+
+
+async def esperar(pg, cond, timeout=15000):
+    await pg.wait_for_function(cond, timeout=timeout)
 
 
 async def nueva_pagina(browser, **kw):
@@ -65,7 +73,7 @@ async def partida_guiada(browser):
         await pg.click(f'#ed-dir .bg-btn[data-d="{d}"]')
         await pg.click(f'#ed-states .bg-btn[data-s="{s}"]')
         await pg.keyboard.press('Enter')
-        await pg.wait_for_timeout(300)
+        await esperar(pg, '!edOpen()')
 
     await pg.click('.wopt.rec')
     for _ in range(3):
@@ -73,25 +81,25 @@ async def partida_guiada(browser):
     await pg.click('.r-cell[data-key="q0,0"]')
     await pg.click('#ed-write .bg-btn[data-w="0"]')
     await pg.keyboard.press('Enter')
-    await pg.wait_for_timeout(300)
+    await esperar(pg, "!edOpen() && $('coach-warn').textContent.length > 0")
     comprobar('no es la que buscamos' in await pg.inner_text('#coach-warn'), 'avisa al elegir una regla equivocada')
     await regla('q0,0', '1', 'R', 'q0')
     await pg.click('#btn-step')
     await pg.keyboard.press('n')
     await pg.keyboard.press('n')
-    await pg.wait_for_timeout(300)
+    await esperar(pg, 'steps >= 3', 5000)
     comprobar(await pg.evaluate('steps') == 3, 'los atajos de teclado funcionan tras pulsar un botón')
     await regla('q0,_', '_', 'S', 'qA')
     await pg.click('#btn-step')
-    await pg.wait_for_timeout(1000)
+    await esperar(pg, "$('res-modal').classList.contains('show')")
     comprobar(await pg.evaluate("$('res-modal').classList.contains('show')"), 'se supera el nivel 1')
     await pg.click('#coach-next')
-    await pg.wait_for_timeout(200)
+    await esperar(pg, 'coachI === -1')
     comprobar(await coach() == -1 and await pg.evaluate('P.idx') == 1, 'la guía termina y pasa al nivel 2')
 
     # Continuar tras definir una regla que faltaba
     await pg.click('#btn-run')
-    await pg.wait_for_timeout(800)
+    await esperar(pg, 'halted')
     comprobar(await pg.evaluate("haltReason") == 'norule', 'se detiene si falta una regla')
     await pg.evaluate("trans=clone(lvl.solution);renderAll()")
     await pg.click('#btn-step')
@@ -118,9 +126,13 @@ async def movil(browser):
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
-        await soluciones(browser)
-        await partida_guiada(browser)
-        await movil(browser)
+        for prueba in (soluciones, partida_guiada, movil):
+            try:
+                await prueba(browser)
+            except Exception as e:
+                ultima = traceback.format_exception_only(type(e), e)[-1].strip().splitlines()[0]
+                traceback.print_exc()
+                comprobar(False, f'{prueba.__name__} se interrumpió: {ultima}'[:400])
         await browser.close()
     print(f'\n{"TODO CORRECTO" if not fallos else f"{len(fallos)} FALLOS"}')
     sys.exit(1 if fallos else 0)
