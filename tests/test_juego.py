@@ -58,7 +58,7 @@ async def soluciones(browser):
       return out;
     }""")
     comprobar(not malas, 'todas las soluciones superan todas sus pruebas' + (f': {malas}' if malas else ''))
-    comprobar(not errores, 'sin errores de JavaScript')
+    comprobar(not errores, 'sin errores de JavaScript' + (f': {errores[:3]}' if errores else ''))
     await pg.close()
 
 
@@ -110,7 +110,7 @@ async def partida_guiada(browser):
     texto = await pg.inner_text('#lic-modal')
     comprobar('Rafael Karino Arillo' in texto and 'MIT' in texto, 'la ventana de licencia es visible desde el pie')
     comprobar(await pg.evaluate("[...document.querySelectorAll('link[rel=icon]')].length") >= 1, 'hay icono para la pestaña')
-    comprobar(not errores, 'sin errores de JavaScript')
+    comprobar(not errores, 'sin errores de JavaScript' + (f': {errores[:3]}' if errores else ''))
     await pg.close()
 
 
@@ -119,7 +119,7 @@ async def movil(browser):
     pg, errores = await nueva_pagina(browser, viewport={'width': 390, 'height': 844}, is_mobile=True)
     await pg.click('text=IR AL JUEGO')
     comprobar(await pg.evaluate('document.documentElement.scrollWidth') <= 390, 'sin desplazamiento horizontal')
-    comprobar(not errores, 'sin errores de JavaScript')
+    comprobar(not errores, 'sin errores de JavaScript' + (f': {errores[:3]}' if errores else ''))
     await pg.close()
 
 
