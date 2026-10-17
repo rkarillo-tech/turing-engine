@@ -1536,8 +1536,8 @@ function positionCoach(){
   x=Math.max(8,Math.min(innerWidth-bw-8,x));y=Math.max(8,Math.min(innerHeight-bh-8,y));
   bx.style.left=x+'px';bx.style.top=y+'px';
 }
-addEventListener('resize',()=>{positionCoach();renderTape()});
-addEventListener('scroll',positionCoach,{passive:true});
+addEventListener('resize',()=>{if(!lvl)return;positionCoach();renderTape()});
+addEventListener('scroll',()=>{if(lvl)positionCoach()},{passive:true});
 
 // ════════════════════════════════════════════════
 //  TUTORIAL (teoría)
@@ -1680,12 +1680,15 @@ $('speed').addEventListener('input',()=>{if(running){clearInterval(runTimer);sta
 // ════════════════════════════════════════════════
 //  ARRANQUE
 // ════════════════════════════════════════════════
-window.addEventListener('load',()=>{
+function init(){
   if(P.mode==='sandbox')loadSandbox();
   else{const i=Math.min(P.idx,LEVELS.length-1);loadLevel(unlocked(P.cycle,i)?i:0,unlocked(P.cycle,i)?P.cycle:0)}
   showTab(P.tab||'trace');
   if(!P.seen)$('wel-modal').classList.add('show');
-});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+// las fuentes cambian el ancho de las celdas: recolocar al terminar de cargar
+addEventListener('load',()=>{if(lvl)renderTape()});
 </script>
 </body>
 </html>
